@@ -1,0 +1,323 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PIPELINE_POSTGRESQL",
+      "label": "Pipeline PostgreSQL",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "postgres",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.2.3" },
+    { "type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0" },
+    { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+    { "type": "panel", "id": "bargauge", "name": "Bar gauge", "version": "" },
+    { "type": "panel", "id": "gauge", "name": "Gauge", "version": "" },
+    { "type": "panel", "id": "table", "name": "Table", "version": "" },
+    { "type": "panel", "id": "stat", "name": "Stat", "version": "" }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+        "enable": true,
+        "hide": false,
+        "iconColor": "red",
+        "name": "Flash Sale Alerts",
+        "rawQuery": true,
+        "rawSql": "SELECT created_at AS time, product_id || ' — Flash Sale Triggered' AS text, 'Flash Sale' AS tags FROM flash_sale_alerts WHERE $__timeFilter(created_at) ORDER BY created_at",
+        "showIn": 0,
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Real-time clickstream analytics — views, conversions, flash-sale alerts and user segments.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Real-Time Stream Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "Views", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "auto", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 80 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "legend": { "calcs": ["max", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "product_id",
+          "rawQuery": true,
+          "rawSql": "SELECT window_end AS time, product_id AS metric, view_count AS value FROM product_view_aggregates WHERE $__timeFilter(window_end) ORDER BY time",
+          "refId": "A",
+          "select": [[{ "params": ["view_count"], "type": "column" }]],
+          "table": "product_view_aggregates",
+          "timeColumn": "window_end",
+          "where": []
+        }
+      ],
+      "title": "Views per Product — Sliding Window (10 min)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "Count", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "bars", "fillOpacity": 80, "gradientMode": "none", "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "normal" }, "thresholdsStyle": { "mode": "off" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT window_end AS time, 'Views' AS metric, SUM(view_count) AS value FROM product_view_aggregates WHERE $__timeFilter(window_end) GROUP BY window_end UNION ALL SELECT window_end AS time, 'Add to Cart' AS metric, SUM(cart_count) AS value FROM product_view_aggregates WHERE $__timeFilter(window_end) GROUP BY window_end UNION ALL SELECT window_end AS time, 'Purchases' AS metric, SUM(purchase_count) AS value FROM product_view_aggregates WHERE $__timeFilter(window_end) GROUP BY window_end ORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Event Funnel Over Time (View → Cart → Purchase)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101,
+      "title": "Flash Sale Alerts",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 }] }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 10 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["count"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) FROM flash_sale_alerts WHERE $__timeFilter(created_at)",
+          "refId": "A"
+        }
+      ],
+      "title": "Flash Sale Alerts Triggered",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "view_count" }, "properties": [{ "id": "displayName", "value": "Views" }, { "id": "custom.width", "value": 100 }] },
+          { "matcher": { "id": "byName", "options": "purchase_count" }, "properties": [{ "id": "displayName", "value": "Purchases" }, { "id": "custom.width", "value": 100 }] },
+          { "matcher": { "id": "byName", "options": "product_id" }, "properties": [{ "id": "displayName", "value": "Product ID" }] },
+          { "matcher": { "id": "byName", "options": "created_at" }, "properties": [{ "id": "displayName", "value": "Triggered At" }, { "id": "unit", "value": "dateTimeAsIso" }] },
+          { "matcher": { "id": "byName", "options": "alert_message" }, "properties": [{ "id": "displayName", "value": "Recommendation" }, { "id": "custom.width", "value": 300 }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 10 },
+      "id": 4,
+      "options": { "cellHeight": "sm", "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Triggered At" }] },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT product_id, view_count, purchase_count, alert_message, created_at FROM flash_sale_alerts WHERE $__timeFilter(created_at) ORDER BY created_at DESC LIMIT 50",
+          "refId": "A"
+        }
+      ],
+      "title": "Flash Sale Alert Log",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 102,
+      "title": "Conversion Analytics",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.05 }, { "color": "green", "value": 0.15 }] },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "id": 5,
+      "options": { "displayMode": "lcd", "minVizHeight": 10, "minVizWidth": 0, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true, "valueMode": "color" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT product_id AS metric, CASE WHEN SUM(view_count) = 0 THEN 0 ELSE ROUND(SUM(purchase_count)::numeric / NULLIF(SUM(view_count), 0), 4) END AS value FROM product_view_aggregates WHERE $__timeFilter(window_end) GROUP BY product_id ORDER BY value DESC LIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Conversion Rate by Product (Purchases / Views)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "rank" }, "properties": [{ "id": "displayName", "value": "#" }, { "id": "custom.width", "value": 50 }] },
+          { "matcher": { "id": "byName", "options": "product_id" }, "properties": [{ "id": "displayName", "value": "Product ID" }] },
+          { "matcher": { "id": "byName", "options": "total_views" }, "properties": [{ "id": "displayName", "value": "Views" }, { "id": "custom.width", "value": 100 }] },
+          { "matcher": { "id": "byName", "options": "total_purchases" }, "properties": [{ "id": "displayName", "value": "Purchases" }, { "id": "custom.width", "value": 100 }] },
+          { "matcher": { "id": "byName", "options": "conversion_rate" }, "properties": [{ "id": "displayName", "value": "Conversion Rate" }, { "id": "unit", "value": "percentunit" }, { "id": "custom.width", "value": 130 }, { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "color-background" } }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.05 }, { "color": "green", "value": 0.15 }] } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "id": 6,
+      "options": { "cellHeight": "sm", "footer": { "show": false }, "showHeader": true },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT rank, product_id, total_views, total_purchases, conversion_rate FROM daily_product_report WHERE report_date = CURRENT_DATE ORDER BY rank ASC LIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 10 Products — Daily Report",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 103,
+      "title": "User Segmentation",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 28 },
+      "id": 7,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) FROM user_segments WHERE segment_date = CURRENT_DATE AND segment = 'Buyer'",
+          "refId": "A"
+        }
+      ],
+      "title": "Buyers Today",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 28 },
+      "id": 8,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) FROM user_segments WHERE segment_date = CURRENT_DATE AND segment = 'Window Shopper'",
+          "refId": "A"
+        }
+      ],
+      "title": "Window Shoppers Today",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" } }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "segment_date" }, "properties": [{ "id": "displayName", "value": "Date" }] },
+          { "matcher": { "id": "byName", "options": "user_id" }, "properties": [{ "id": "displayName", "value": "User ID" }] },
+          { "matcher": { "id": "byName", "options": "segment" }, "properties": [{ "id": "displayName", "value": "Segment" }, { "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, { "id": "mappings", "value": [{ "options": { "Buyer": { "color": "green", "index": 0 }, "Window Shopper": { "color": "blue", "index": 1 } }, "type": "value" }] }] },
+          { "matcher": { "id": "byName", "options": "total_views" }, "properties": [{ "id": "displayName", "value": "Views" }] },
+          { "matcher": { "id": "byName", "options": "total_purchases" }, "properties": [{ "id": "displayName", "value": "Purchases" }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "id": 9,
+      "options": { "cellHeight": "sm", "footer": { "show": false }, "showHeader": true },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "pipeline-pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT segment_date, user_id, segment, total_views, total_purchases FROM user_segments WHERE segment_date = CURRENT_DATE ORDER BY total_purchases DESC, total_views DESC LIMIT 50",
+          "refId": "A"
+        }
+      ],
+      "title": "User Segment Detail — Today",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["clickstream", "ecommerce", "kappa", "real-time"],
+  "templating": { "list": [] },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "E-Commerce Clickstream & Inventory Watch",
+  "uid": "ecom-clickstream-v1",
+  "version": 1
+}
