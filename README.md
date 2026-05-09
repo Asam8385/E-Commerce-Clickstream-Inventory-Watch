@@ -6,6 +6,8 @@ A production-grade real-time data pipeline built on the **Kappa Architecture** f
 
 ## Architecture
 
+![Kappa Architecture Diagram](architecture/kappa_architecture.drawio.png)
+
 ```
 Clickstream Simulator ──► Kafka ──► Spark Structured Streaming ──► PostgreSQL
                                           │                              │
@@ -41,7 +43,8 @@ Clickstream Simulator ──► Kafka ──► Spark Structured Streaming ─�
 ```
 pipeline/
 ├── architecture/
-│   └── kappa_architecture.drawio        # Architecture diagram (draw.io)
+│   ├── kappa_architecture.drawio        # Architecture diagram source (draw.io)
+│   └── kappa_architecture.drawio.png    # Exported architecture diagram
 ├── config/
 │   ├── kafka_config.py                  # Kafka connection constants
 │   ├── spark_config.py                  # Spark job configuration
