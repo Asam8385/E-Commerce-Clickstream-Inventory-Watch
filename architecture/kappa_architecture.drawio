@@ -1,0 +1,212 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17">
+  <diagram name="Kappa Architecture — E-Commerce Clickstream Pipeline" id="kappa-ecommerce-pipeline">
+    <mxGraphModel dx="2960" dy="1731" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2336" pageHeight="1654" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="L1" value="DATA SOURCE" style="swimlane;startSize=32;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;fontColor=#003366;rounded=1;arcSize=4;" parent="1" vertex="1">
+          <mxGeometry x="10" y="610" width="210" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="L1-sim" value="&lt;b&gt;Clickstream Simulator&lt;/b&gt;&lt;br&gt;Python Producer&lt;br&gt;~1 000 events / min" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="L1" vertex="1">
+          <mxGeometry x="15" y="48" width="180" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="L1-schema" value="&lt;b&gt;Event Schema&lt;/b&gt;&lt;br&gt;event_id  |  user_id&lt;br&gt;product_id  |  event_type&lt;br&gt;timestamp  |  session_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#f9a825;fontSize=10;" parent="L1" vertex="1">
+          <mxGeometry x="15" y="133" width="180" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="L1-events" value="&lt;b&gt;Event Types&lt;/b&gt;&lt;br&gt;● view (70%)&lt;br&gt;● add_to_cart (20%)&lt;br&gt;● purchase (10%)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontSize=10;" parent="L1" vertex="1">
+          <mxGeometry x="15" y="228" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="L1-catalog" value="&lt;b&gt;Electronics Catalogue&lt;/b&gt;&lt;br&gt;50 simulated SKUs&lt;br&gt;500 virtual users" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;" parent="L1" vertex="1">
+          <mxGeometry x="15" y="328" width="180" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="L1-rate" value="&lt;b&gt;Rate Control&lt;/b&gt;&lt;br&gt;0.06 s sleep between sends&lt;br&gt;Configurable burst mode" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="L1" vertex="1">
+          <mxGeometry x="15" y="413" width="180" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="L2" value="KAFKA STREAMING LAYER" style="swimlane;startSize=32;fillColor=#fff9c4;strokeColor=#f9a825;fontStyle=1;fontSize=12;fontColor=#5d4037;rounded=1;arcSize=4;" parent="1" vertex="1">
+          <mxGeometry x="365" y="410" width="230" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="L2-zk" value="&lt;b&gt;ZooKeeper 3.8&lt;/b&gt;&lt;br&gt;Cluster Coordinator&lt;br&gt;Port: 2181" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;fontSize=10;" parent="L2" vertex="1">
+          <mxGeometry x="15" y="48" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="L2-broker" value="&lt;b&gt;Kafka Broker (Confluent 7.5)&lt;/b&gt;&lt;br&gt;Port: 9092&lt;br&gt;Log retention: 168 h (7 days)&lt;br&gt;Auto-create topics: enabled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;fontSize=10;" parent="L2" vertex="1">
+          <mxGeometry x="15" y="123" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="L2-topic" value="&lt;b&gt;Topic: clickstream-events&lt;/b&gt;&lt;br&gt;Partitions: 6&lt;br&gt;Replication factor: 1&lt;br&gt;Serialisation: JSON / UTF-8&lt;br&gt;Key: product_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#e65100;fontSize=10;" parent="L2" vertex="1">
+          <mxGeometry x="15" y="223" width="200" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="L2-ui" value="&lt;b&gt;Kafka UI&lt;/b&gt;&lt;br&gt;provectuslabs/kafka-ui&lt;br&gt;http://localhost:8085" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;fontSize=10;" parent="L2" vertex="1">
+          <mxGeometry x="15" y="338" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="L2-replay" value="&lt;b&gt;Replay Capability&lt;/b&gt;&lt;br&gt;Offset management per consumer group&lt;br&gt;Historical reprocessing via Kappa" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;fontSize=10;" parent="L2" vertex="1">
+          <mxGeometry x="15" y="413" width="200" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="L3" value="SPARK STRUCTURED STREAMING&#xa; (REAL-TIME PROCESSING)" style="swimlane;startSize=32;fillColor=#fce4ec;strokeColor=#c62828;fontStyle=1;fontSize=12;fontColor=#7b0000;rounded=1;arcSize=4;" parent="1" vertex="1">
+          <mxGeometry x="675" y="520" width="290" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="L3-engine" value="&lt;b&gt;Spark 3.4 Structured Streaming&lt;/b&gt;&lt;br&gt;Kafka Source Connector&lt;br&gt;Micro-batch trigger: 30 s&lt;br&gt;Processing mode: Event-Time" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontSize=10;" parent="L3" vertex="1">
+          <mxGeometry x="15" y="48" width="260" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="L3-wm" value="&lt;b&gt;Watermarking&lt;/b&gt;&lt;br&gt;Late-data tolerance: 5 min&lt;br&gt;Basis: event_time field&lt;br&gt;(not Kafka ingestion time)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#e65100;fontSize=10;" parent="L3" vertex="1">
+          <mxGeometry x="15" y="143" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="L3-window" value="&lt;b&gt;Sliding Window Aggregation&lt;/b&gt;&lt;br&gt;Window size: 10 minutes&lt;br&gt;Slide interval: 2 minutes&lt;br&gt;GROUP BY product_id, event_type&lt;br&gt;COUNT(*) per window" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontSize=10;" parent="L3" vertex="1">
+          <mxGeometry x="15" y="233" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="L3-logic" value="&lt;b&gt;Business Logic Engine&lt;/b&gt;&lt;br&gt;IF views &gt; 100 AND purchases &lt; 5&lt;br&gt;THEN → FLASH_SALE_CANDIDATE&lt;br&gt;Alert type: High Interest / Low Conversion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b71c1c;strokeColor=#7f0000;fontSize=10;fontColor=#ffffff;fontStyle=1;" parent="L3" vertex="1">
+          <mxGeometry x="15" y="343" width="260" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="L3-fb" value="&lt;b&gt;foreachBatch Writer&lt;/b&gt;&lt;br&gt;Writes raw_events + product_metrics&lt;br&gt;to PostgreSQL via JDBC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontSize=10;" parent="L3" vertex="1">
+          <mxGeometry x="15" y="438" width="260" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="L4" value="STORAGE LAYER" style="swimlane;startSize=32;fillColor=#e8f5e9;strokeColor=#2e7d32;fontStyle=1;fontSize=12;fontColor=#1b5e20;rounded=1;arcSize=4;" parent="1" vertex="1">
+          <mxGeometry x="1025" y="380" width="240" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="L4-db" value="&lt;b&gt;PostgreSQL 15&lt;/b&gt;&lt;br&gt;ACID-compliant relational store&lt;br&gt;Port: 5432" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;" parent="L4" vertex="1">
+          <mxGeometry x="15" y="48" width="210" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="L4-raw" value="&lt;b&gt;Table: raw_events&lt;/b&gt;&lt;br&gt;event_id, user_id, product_id&lt;br&gt;event_type, event_time&lt;br&gt;session_id, kafka_timestamp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;" parent="L4" vertex="1">
+          <mxGeometry x="15" y="133" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="L4-metrics" value="&lt;b&gt;Table: product_metrics&lt;/b&gt;&lt;br&gt;product_id, window_start/end&lt;br&gt;view_count, purchase_count&lt;br&gt;conversion_rate (computed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;" parent="L4" vertex="1">
+          <mxGeometry x="15" y="233" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="L4-segs" value="&lt;b&gt;Table: user_segments&lt;/b&gt;&lt;br&gt;user_id, segment, segment_date&lt;br&gt;(Window_Shopper / Prospective_Buyer / Buyer)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;" parent="L4" vertex="1">
+          <mxGeometry x="15" y="333" width="210" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="L4-alerts" value="&lt;b&gt;Table: flash_sale_alerts&lt;/b&gt;&lt;br&gt;product_id, window_start/end&lt;br&gt;view_count, purchase_count&lt;br&gt;alert_type, triggered_at" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c62828;fontSize=10;" parent="L4" vertex="1">
+          <mxGeometry x="15" y="428" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="L5" value="AIRFLOW ORCHESTRATION (BATCH QUERIES)" style="swimlane;startSize=32;fillColor=#ede7f6;strokeColor=#6a1b9a;fontStyle=1;fontSize=12;fontColor=#4a0072;rounded=1;arcSize=4;" parent="1" vertex="1">
+          <mxGeometry x="1475" y="480" width="270" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="L5-sched" value="&lt;b&gt;Airflow Scheduler&lt;/b&gt;&lt;br&gt;Schedule: @daily (00:00 UTC)&lt;br&gt;Executor: LocalExecutor&lt;br&gt;http://localhost:8082" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#6a1b9a;fontSize=10;" parent="L5" vertex="1">
+          <mxGeometry x="15" y="48" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="L5-dag1" value="&lt;b&gt;DAG: user_segmentation&lt;/b&gt;&lt;br&gt;① Extract raw_events for the day&lt;br&gt;② Classify users (view/cart/purchase)&lt;br&gt;③ Upsert user_segments table" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#6a1b9a;fontSize=10;" parent="L5" vertex="1">
+          <mxGeometry x="15" y="138" width="240" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="L5-dag2" value="&lt;b&gt;DAG: daily_product_report&lt;/b&gt;&lt;br&gt;① Query product_metrics&lt;br&gt;② Rank by total_views DESC&lt;br&gt;③ Write top_products_&lt;date&gt;.txt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#6a1b9a;fontSize=10;" parent="L5" vertex="1">
+          <mxGeometry x="15" y="260" width="240" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="L5-dag3" value="&lt;b&gt;DAG: conversion_rate_report&lt;/b&gt;&lt;br&gt;① Join metrics × category map&lt;br&gt;② Compute conversion_rate_pct&lt;br&gt;③ Export conversion_rates_&lt;date&gt;.csv" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#6a1b9a;fontSize=10;" parent="L5" vertex="1">
+          <mxGeometry x="15" y="358" width="240" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="L5-conn" value="&lt;b&gt;Postgres Connection&lt;/b&gt;&lt;br&gt;conn_id: postgres_ecommerce&lt;br&gt;PostgresHook (provider)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#6a1b9a;fontSize=10;" parent="L5" vertex="1">
+          <mxGeometry x="15" y="468" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="L6" value="OUTPUT &amp; REPORTS" style="swimlane;startSize=32;fillColor=#212121;strokeColor=#424242;fontStyle=1;fontSize=12;fontColor=#ffffff;rounded=1;arcSize=4;" parent="1" vertex="1">
+          <mxGeometry x="1945" y="540" width="230" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="L6-alert" value="&lt;b&gt;Flash Sale Alert&lt;/b&gt;&lt;br&gt;Real-time notification&lt;br&gt;Written to flash_sale_alerts&lt;br&gt;+ console / webhook" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b71c1c;strokeColor=#7f0000;fontSize=10;fontColor=#ffffff;fontStyle=1;" parent="L6" vertex="1">
+          <mxGeometry x="15" y="48" width="200" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="L6-seg" value="&lt;b&gt;User Segmentation CSV&lt;/b&gt;&lt;br&gt;Window Shoppers&lt;br&gt;Prospective Buyers&lt;br&gt;Buyers — counts &amp; %%" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#6a1b9a;fontSize=10;" parent="L6" vertex="1">
+          <mxGeometry x="15" y="143" width="200" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="L6-top5" value="&lt;b&gt;top_products_&lt;date&gt;.txt&lt;/b&gt;&lt;br&gt;Ranked list of top 5 products&lt;br&gt;with views, purchases&lt;br&gt;and conversion rates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;" parent="L6" vertex="1">
+          <mxGeometry x="15" y="238" width="200" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="L6-csv" value="&lt;b&gt;conversion_rates_&lt;date&gt;.csv&lt;/b&gt;&lt;br&gt;product_id, category&lt;br&gt;total_views, total_purchases&lt;br&gt;conversion_rate_pct" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;fontSize=10;" parent="L6" vertex="1">
+          <mxGeometry x="15" y="333" width="200" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="L6-arch" value="&lt;b&gt;Architecture: KAPPA&lt;/b&gt;&lt;br&gt;No Lambda batch layer.&lt;br&gt;Airflow queries the same&lt;br&gt;streaming store." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#37474f;strokeColor=#263238;fontSize=10;fontColor=#eceff1;" parent="L6" vertex="1">
+          <mxGeometry x="15" y="428" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="produce events&lt;br&gt;JSON over TCP" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#1565c0;strokeWidth=2;fillColor=#dae8fc;fontSize=9;fontColor=#1565c0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" parent="1" source="L1-sim" target="L2-broker" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280" y="840.5" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="subscribe&lt;br&gt;(earliest offset)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#e65100;strokeWidth=2;fillColor=#fff9c4;fontSize=9;fontColor=#e65100;" parent="1" source="L2-topic" target="L3-engine" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="645" y="681" />
+              <mxPoint x="645" y="465" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#c62828;strokeWidth=1;" parent="1" source="L3-engine" target="L3-wm" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#c62828;strokeWidth=1;" parent="1" source="L3-wm" target="L3-window" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#c62828;strokeWidth=1;" parent="1" source="L3-window" target="L3-logic" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="write stream&lt;br&gt;(append mode)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2e7d32;strokeWidth=2;fontSize=9;fontColor=#2e7d32;" parent="1" source="L3-fb" target="L4-raw" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1005" y="985" />
+              <mxPoint x="1005" y="553" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="write aggregations&lt;br&gt;(update mode)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2e7d32;strokeWidth=2;fontSize=9;fontColor=#2e7d32;" parent="1" source="L3-window" target="L4-metrics" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="995" y="798" />
+              <mxPoint x="995" y="653" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="trigger alert" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b71c1c;strokeWidth=3;fontSize=9;fontColor=#b71c1c;fontStyle=1;" parent="1" source="L3-logic" target="L4-alerts" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="flash sale&lt;br&gt;notification" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b71c1c;strokeWidth=3;fontSize=9;fontColor=#b71c1c;fontStyle=1;" parent="1" source="L4-alerts" target="L6-alert" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1145" y="1110" />
+              <mxPoint x="2325" y="1110" />
+              <mxPoint x="2325" y="625" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="daily batch read" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6a1b9a;strokeWidth=2;fontSize=9;fontColor=#6a1b9a;" parent="1" source="L4-raw" target="L5-dag1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1345" y="553" />
+              <mxPoint x="1345" y="550" />
+              <mxPoint x="1425" y="550" />
+              <mxPoint x="1425" y="663" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" value="daily batch read" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6a1b9a;strokeWidth=2;fontSize=9;fontColor=#6a1b9a;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="L4-metrics" target="L5-dag2" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1355" y="653" />
+              <mxPoint x="1355" y="720" />
+              <mxPoint x="1610" y="720" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12" value="daily batch read" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6a1b9a;strokeWidth=2;fontSize=9;fontColor=#6a1b9a;" parent="1" source="L4-metrics" target="L5-dag3" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1335" y="653" />
+              <mxPoint x="1335" y="883" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13" value="persist segments" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6a1b9a;strokeWidth=2;fontSize=9;fontColor=#6a1b9a;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="L5-dag1" target="L4-segs" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1445" y="663" />
+              <mxPoint x="1445" y="751" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e14" value="write report" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6a1b9a;strokeWidth=2;fontSize=9;fontColor=#6a1b9a;" parent="1" source="L5-dag1" target="L6-seg" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="write report" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6a1b9a;strokeWidth=2;fontSize=9;fontColor=#6a1b9a;" parent="1" source="L5-dag2" target="L6-top5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="export CSV" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6a1b9a;strokeWidth=2;fontSize=9;fontColor=#6a1b9a;" parent="1" source="L5-dag3" target="L6-csv" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
