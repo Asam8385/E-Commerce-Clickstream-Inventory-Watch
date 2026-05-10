@@ -40,6 +40,6 @@ JDBC_PROPERTIES: dict = {
 
 # Spark packages (passed via --packages or SparkConf)
 SPARK_PACKAGES: str = (
-    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,"
+    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,"
     "org.postgresql:postgresql:42.6.0"
 )

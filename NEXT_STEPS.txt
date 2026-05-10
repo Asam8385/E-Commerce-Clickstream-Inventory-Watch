@@ -1,0 +1,156 @@
+================================================================
+  E-COMMERCE CLICKSTREAM PIPELINE — REMAINING STEPS
+================================================================
+All containers are running. Two bugs have already been fixed:
+  1. Ivy cache directory missing  → fixed live inside spark-master
+  2. Python 3.8 type hint error   → fixed in spark/streaming_job.py
+
+Run every step below IN ORDER using PowerShell from:
+  C:\Users\ASAM\Desktop\pipeline
+================================================================
+
+
+STEP 1 — Fix Ivy cache on running containers (run once per restart)
+--------------------------------------------------------------------
+docker exec -u root spark-master bash -c "mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars && chown -R spark:spark /home/spark"
+docker exec -u root spark-worker bash -c "mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars && chown -R spark:spark /home/spark"
+
+Expected output: no errors (silent success)
+
+
+STEP 2 — Start the Spark Structured Streaming job
+--------------------------------------------------------------------
+NOTE: This runs in the FOREGROUND and keeps printing logs.
+      Open a NEW PowerShell window for steps 3 onward.
+
+docker exec spark-master /opt/spark/bin/spark-submit `
+  --master spark://spark-master:7077 `
+  --packages "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.postgresql:postgresql:42.6.0" `
+  /opt/pipeline/spark/streaming_job.py
+
+Expected output (within ~30 seconds):
+  INFO StandaloneSchedulerBackend: Connected to Spark cluster with app ID app-...
+  INFO MicroBatchExecution: Streaming query started (clickstream-raw-ingest)
+  INFO MicroBatchExecution: Streaming query started (aggregate-writer)
+
+
+STEP 3 — Verify Spark is processing data
+--------------------------------------------------------------------
+Open in browser:  http://localhost:8080
+You should see:
+  - Application "EcommerceClickstreamProcessor" listed as RUNNING
+  - 1 worker with 2 cores
+
+
+STEP 4 — Trigger Airflow DAGs
+--------------------------------------------------------------------
+Run this in a NEW PowerShell window (one-time command):
+
+$cred = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("admin:admin"))
+$h = @{ "Authorization" = "Basic $cred"; "Content-Type" = "application/json" }
+
+# Unpause + trigger user_segmentation
+Invoke-RestMethod -Method PATCH -Uri "http://localhost:8081/api/v1/dags/user_segmentation" -Headers $h -Body '{"is_paused":false}'
+Invoke-RestMethod -Method POST  -Uri "http://localhost:8081/api/v1/dags/user_segmentation/dagRuns" -Headers $h -Body '{}'
+
+# Unpause + trigger daily_product_report
+Invoke-RestMethod -Method PATCH -Uri "http://localhost:8081/api/v1/dags/daily_product_report" -Headers $h -Body '{"is_paused":false}'
+Invoke-RestMethod -Method POST  -Uri "http://localhost:8081/api/v1/dags/daily_product_report/dagRuns" -Headers $h -Body '{}'
+
+Expected output: JSON with dag_run_id fields for each DAG
+
+--- OR use the UI instead ---
+Open http://localhost:8081  (login: admin / admin)
+Toggle both DAGs from Paused to Active, then click the Play button on each.
+
+
+STEP 5 — Verify Airflow DAG runs completed
+--------------------------------------------------------------------
+Open in browser:  http://localhost:8081
+Click each DAG name and confirm the latest run shows a GREEN circle.
+If it shows RED, click the run → Logs to see the error.
+
+
+STEP 6 — Generate the conversion rate report
+--------------------------------------------------------------------
+Run in PowerShell from the pipeline folder:
+
+pip install -r reports/requirements.txt
+python reports/conversion_rate_report.py
+
+Expected output:
+  [INFO] Wrote reports/output/conversion_rates_2026-05-10.csv
+  [INFO] Wrote reports/output/category_conversion_summary_2026-05-10.txt
+
+Check the files exist:
+  dir reports\output\
+
+
+STEP 7 — Verify Grafana dashboard
+--------------------------------------------------------------------
+Open in browser:  http://localhost:3000  (login: admin / admin)
+Navigate to Dashboards → "E-Commerce Clickstream & Inventory Watch"
+You should see 4 panels updating with live data:
+  - Real-time Product Views (bar chart)
+  - Event Funnel (view → cart → purchase)
+  - Flash Sale Alerts (table)
+  - User Segmentation (pie chart, populates after Airflow DAG runs)
+
+
+STEP 8 — Verify data landed in PostgreSQL
+--------------------------------------------------------------------
+docker exec postgres psql -U pipeline -d pipeline -c "
+  SELECT 'clickstream_events'      AS tbl, COUNT(*) FROM clickstream_events
+  UNION ALL
+  SELECT 'product_view_aggregates', COUNT(*) FROM product_view_aggregates
+  UNION ALL
+  SELECT 'flash_sale_alerts',       COUNT(*) FROM flash_sale_alerts
+  UNION ALL
+  SELECT 'user_segments',           COUNT(*) FROM user_segments
+  UNION ALL
+  SELECT 'daily_product_report',    COUNT(*) FROM daily_product_report;
+"
+
+Expected: non-zero counts in all five tables.
+
+
+STEP 9 — Final Git commit
+--------------------------------------------------------------------
+cd C:\Users\ASAM\Desktop\pipeline
+
+git add spark/streaming_job.py spark/Dockerfile
+git add reports/output/
+git commit -m "fix: Python 3.8 type hints + Ivy cache dir; add report outputs"
+
+
+================================================================
+  QUICK REFERENCE — SERVICE URLS
+================================================================
+Spark Master UI   http://localhost:8080   (no login)
+Airflow           http://localhost:8081   admin / admin
+Grafana           http://localhost:3000   admin / admin
+PostgreSQL        localhost:5432          user: pipeline / pipeline
+Kafka             localhost:9092          topic: clickstream-events
+================================================================
+
+TROUBLESHOOTING
+--------------------------------------------------------------------
+Q: spark-submit still fails with "No such file or directory" on .ivy2
+A: Re-run STEP 1 — the fix only lasts until the container is restarted.
+   To make it permanent: docker compose restart spark-master spark-worker
+   then re-run STEP 1 before STEP 2.
+
+Q: Airflow DAG shows red / ImportError on psycopg2
+A: The _PIP_ADDITIONAL_REQUIREMENTS in docker-compose.yml handles this.
+   If still failing: docker compose restart airflow-scheduler airflow-webserver
+
+Q: docker exec keeps giving "500 Internal Server Error"
+A: Docker Desktop is dropping its engine pipe temporarily.
+   Wait 10 seconds and retry. If persistent, restart Docker Desktop.
+   Minikube is also running and competing for resources — consider:
+     minikube stop
+
+Q: Grafana panels show "No data"
+A: Spark needs a few minutes to produce the first micro-batch.
+   Wait 2 minutes after STEP 2 confirms streaming started, then refresh.
+================================================================

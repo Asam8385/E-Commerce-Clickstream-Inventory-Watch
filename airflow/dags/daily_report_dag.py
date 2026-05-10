@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import List, Tuple
 from urllib.parse import urlparse
 
 import psycopg2
@@ -28,7 +29,7 @@ def get_connection_kwargs() -> dict:
     }
 
 
-def build_report_contents(report_date: str, rows: list[tuple]) -> str:
+def build_report_contents(report_date: str, rows: List[Tuple]) -> str:
     header = [
         "E-Commerce Daily Top Product Summary",
         f"Report Date: {report_date}",

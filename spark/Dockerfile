@@ -1,8 +1,12 @@
-FROM bitnami/spark:3.4.1
+FROM apache/spark:3.5.0
 
-USER 0
+USER root
 
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+	&& mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars \
+	&& chown -R spark:spark /home/spark
 
-USER 1001
+ENV HOME=/home/spark
+
+USER spark

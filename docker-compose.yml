@@ -7,6 +7,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    AIRFLOW__WEBSERVER__SECRET_KEY: "pipeline-secret-key-change-in-prod"
     PIPELINE_DB_CONN: postgresql+psycopg2://pipeline:pipeline@postgres:5432/pipeline
     AIRFLOW_REPORT_OUTPUT_DIR: /opt/airflow/reports/output
     _PIP_ADDITIONAL_REQUIREMENTS: psycopg2-binary==2.9.9
@@ -87,35 +88,37 @@ services:
     build:
       context: ./spark
       dockerfile: Dockerfile
-    image: pipeline-spark:3.4.1
+    image: pipeline-spark:3.5.0
     container_name: spark-master
     environment:
       PYTHONPATH: /opt/pipeline
-      SPARK_MODE: master
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_MASTER_HOST: spark-master
+      SPARK_NO_DAEMONIZE: "true"
     ports:
       - "8080:8080"
       - "7077:7077"
+    command: ["/opt/spark/sbin/start-master.sh"]
     volumes:
       - ./spark:/opt/pipeline/spark
       - ./config:/opt/pipeline/config
-      - spark_data:/opt/bitnami/spark/data
+      - spark_data:/opt/spark/data
 
   # ---------------------------------------------------------------------------
   # Apache Spark Worker
   # ---------------------------------------------------------------------------
   spark-worker:
-    image: pipeline-spark:3.4.1
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
+    image: pipeline-spark:3.5.0
     container_name: spark-worker
     environment:
       PYTHONPATH: /opt/pipeline
-      SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077
       SPARK_WORKER_MEMORY: 2G
       SPARK_WORKER_CORES: 2
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_NO_DAEMONIZE: "true"
+    command: ["/opt/spark/sbin/start-worker.sh", "spark://spark-master:7077"]
     depends_on:
       - spark-master
     volumes:

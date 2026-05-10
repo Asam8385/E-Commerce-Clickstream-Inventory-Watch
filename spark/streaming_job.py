@@ -1,5 +1,6 @@
 import psycopg2
 from psycopg2.extras import execute_values
+from typing import List, Tuple
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
@@ -109,7 +110,7 @@ def aggregate_windows(stream):
     )
 
 
-def execute_upsert(query: str, rows: list[tuple]) -> None:
+def execute_upsert(query: str, rows: List[Tuple]) -> None:
     if not rows:
         return
 
