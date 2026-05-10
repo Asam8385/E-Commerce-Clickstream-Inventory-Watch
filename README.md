@@ -32,6 +32,7 @@ Clickstream Simulator ──► Kafka ──► Spark Structured Streaming ─�
 | Message Broker | Apache Kafka | 7.5.0 (Confluent) |
 | Stream Processor | Apache Spark Structured Streaming | 3.4.1 |
 | Orchestration | Apache Airflow | 2.8.1 |
+| Dashboarding | Grafana | 10.2.3 |
 | Storage | PostgreSQL | 15 |
 | Producer | Python (kafka-python) | 3.11 |
 | Infrastructure | Docker Compose | v3.8 |
@@ -61,6 +62,14 @@ pipeline/
 │   │   ├── user_segmentation_dag.py     # Daily user segmentation DAG
 │   │   └── daily_report_dag.py          # Daily top-5 products report DAG
 │   └── requirements.txt
+├── grafana/
+│   ├── dashboards/
+│   │   └── clickstream_dashboard.json   # Auto-provisioned Grafana dashboard
+│   └── provisioning/
+│       ├── dashboards/
+│       │   └── dashboards.yaml
+│       └── datasources/
+│           └── postgresql.yaml
 ├── reports/
 │   ├── conversion_rate_report.py        # Conversion rate analytics generator
 │   └── output/                          # Generated report artefacts
@@ -92,9 +101,9 @@ Services exposed:
 
 | Service | URL |
 |---------|-----|
-| Kafka UI | http://localhost:8085 |
 | Spark Master UI | http://localhost:8080 |
-| Airflow Webserver | http://localhost:8082 (admin / admin) |
+| Airflow Webserver | http://localhost:8081 (admin / admin) |
+| Grafana Dashboard | http://localhost:3000 (admin / admin) |
 | PostgreSQL | localhost:5432 |
 
 ### 2. Run the clickstream producer
@@ -108,18 +117,23 @@ python clickstream_producer.py
 ### 3. Submit the Spark Streaming job
 
 ```bash
-docker exec ecommerce_spark_master spark-submit \
+docker exec spark-master spark-submit \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.postgresql:postgresql:42.6.0 \
-  /opt/bitnami/spark/jobs/streaming_job.py
+  /opt/spark-jobs/streaming_job.py
 ```
 
 ### 4. Trigger Airflow DAGs
 
-Navigate to http://localhost:8082, enable and manually trigger:
+Navigate to http://localhost:8081, enable and manually trigger:
 - `user_segmentation`
 - `daily_product_report`
 
-### 5. Generate the conversion rate report
+### 5. Open the Grafana dashboard
+
+Navigate to http://localhost:3000 and open the auto-provisioned dashboard:
+- `E-Commerce Clickstream & Inventory Watch`
+
+### 6. Generate the conversion rate report
 
 ```bash
 cd reports
@@ -133,7 +147,7 @@ python conversion_rate_report.py
 
 ### Flash Sale Trigger
 
-The Spark Streaming job maintains a **10-minute sliding window** (slide interval: 2 minutes) per product. When a product exceeds **100 views** with **fewer than 5 purchases** within that window, a `FLASH_SALE_CANDIDATE` alert is written to `flash_sale_alerts`.
+The Spark Streaming job maintains a **10-minute sliding window** (slide interval: 1 minute) per product. When a product exceeds **100 views** with **fewer than 5 purchases** within that window, an alert record is written to `flash_sale_alerts` and becomes visible in Grafana.
 
 ### User Segmentation
 
@@ -142,8 +156,7 @@ Airflow runs `@daily` to classify every active user:
 | Segment | Criteria |
 |---------|----------|
 | `Buyer` | At least one `purchase` event |
-| `Prospective_Buyer` | At least one `add_to_cart`, no purchase |
-| `Window_Shopper` | Only `view` events |
+| `Window Shopper` | No `purchase` events during the daily interval |
 
 ### Conversion Rate
 
@@ -159,6 +172,18 @@ All generated artefacts land in `reports/output/`:
 |------|-------------|
 | `top_products_<date>.txt` | Top 5 most viewed products with conversion rates |
 | `conversion_rates_<date>.csv` | Full per-product conversion rate breakdown |
+
+---
+
+## Dashboard
+
+Grafana is provisioned automatically at startup and uses PostgreSQL as its datasource. The dashboard includes:
+
+- real-time product views in 10-minute sliding windows
+- event funnel monitoring (views, add-to-cart, purchases)
+- flash-sale alert counts and detailed alert log
+- daily top-product conversion performance
+- buyer vs window-shopper segmentation snapshots
 
 ---
 

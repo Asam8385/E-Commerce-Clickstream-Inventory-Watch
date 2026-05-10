@@ -1,5 +1,3 @@
-version: "3.8"
-
 x-airflow-common: &airflow-common
   image: apache/airflow:2.8.1
   environment: &airflow-common-env
@@ -10,8 +8,11 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
     PIPELINE_DB_CONN: postgresql+psycopg2://pipeline:pipeline@postgres:5432/pipeline
+    AIRFLOW_REPORT_OUTPUT_DIR: /opt/airflow/reports/output
+    _PIP_ADDITIONAL_REQUIREMENTS: psycopg2-binary==2.9.9
   volumes:
     - ./airflow/dags:/opt/airflow/dags
+    - ./reports/output:/opt/airflow/reports/output
     - airflow_logs:/opt/airflow/logs
     - airflow_plugins:/opt/airflow/plugins
   depends_on:
