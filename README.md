@@ -172,6 +172,7 @@ All generated artefacts land in `reports/output/`:
 |------|-------------|
 | `top_products_<date>.txt` | Top 5 most viewed products with conversion rates |
 | `conversion_rates_<date>.csv` | Full per-product conversion rate breakdown |
+| `category_conversion_summary_<date>.txt` | Summary of conversion rates aggregated by product category |
 
 ---
 

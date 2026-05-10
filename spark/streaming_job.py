@@ -174,6 +174,7 @@ def write_raw_events_to_postgres(stream):
             batch_df.select(
                 "user_id",
                 "product_id",
+                "category",
                 "event_type",
                 F.col("event_time").alias("event_time"),
                 F.current_timestamp().alias("ingested_at"),

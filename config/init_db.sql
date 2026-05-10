@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS clickstream_events (
     id            BIGSERIAL    PRIMARY KEY,
     user_id       VARCHAR(64)  NOT NULL,
     product_id    VARCHAR(64)  NOT NULL,
+    category      VARCHAR(64),
     event_type    VARCHAR(16)  NOT NULL CHECK (event_type IN ('view', 'add_to_cart', 'purchase')),
     event_time    TIMESTAMPTZ  NOT NULL,
     ingested_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
