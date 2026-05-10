@@ -1,0 +1,257 @@
+
+================================================================================
+ SECTION 1 — FIRST-TIME SETUP  (run once, never again)
+================================================================================
+
+Only needed if you have never built the images on this machine.
+
+  cd C:\Users\ASAM\Desktop\pipeline
+  docker compose build
+
+This builds two custom images:
+  • pipeline-spark:3.5.0   (Spark + psycopg2)
+  • pipeline-producer:latest (Kafka producer)
+
+Takes ~5 minutes. After it completes you never need to run it again unless
+you change a Dockerfile or requirements.txt.
+
+================================================================================
+ SECTION 2 — STARTING THE SYSTEM (every time after a shutdown)
+================================================================================
+
+STEP 1 — Start all containers
+──────────────────────────────
+  cd C:\Users\ASAM\Desktop\pipeline
+  docker compose up -d
+
+Wait ~60 seconds for Kafka and PostgreSQL health checks to pass.
+
+STEP 2 — Confirm all 9 containers are healthy
+───────────────────────────────────────────────
+  docker ps --format "table {{.Names}}`t{{.Status}}"
+
+Expected output (all should say "Up" — kafka/postgres/zookeeper also say "healthy"):
+  zookeeper          Up X minutes (healthy)
+  kafka              Up X minutes (healthy)
+  postgres           Up X minutes (healthy)
+  spark-master       Up X minutes
+  spark-worker       Up X minutes
+  clickstream-producer  Up X minutes
+  airflow-webserver  Up X minutes
+  airflow-scheduler  Up X minutes
+  grafana            Up X minutes
+
+If airflow-init appears, that is normal — it exits after initialising the DB.
+
+STEP 3 — Fix Ivy cache (REQUIRED after every fresh container start)
+────────────────────────────────────────────────────────────────────
+The Spark image needs write access to ~/.ivy2 for JAR caching.
+Run this once each time the containers start:
+
+  docker exec -u root spark-master bash -c "mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars && chown -R spark:spark /home/spark"
+  docker exec -u root spark-worker  bash -c "mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars && chown -R spark:spark /home/spark"
+
+NOTE: This will no longer be needed after you rebuild the image with the
+updated Dockerfile (which already has this fix baked in). To make it permanent:
+  docker compose build spark-master spark-worker
+  docker compose up -d spark-master spark-worker
+
+STEP 4 — Start the Spark Streaming Job
+────────────────────────────────────────
+Open a DEDICATED terminal window and run (keep it open — this runs forever):
+
+  docker exec spark-master /opt/spark/bin/spark-submit `
+    --master spark://spark-master:7077 `
+    --packages "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.postgresql:postgresql:42.6.0" `
+    /opt/pipeline/spark/streaming_job.py
+
+First run takes ~60 seconds to resolve JARs from Maven Central.
+Subsequent runs are instant (JARs cached in /home/spark/.ivy2/jars).
+
+You will know it is working when you see log lines like:
+  INFO MicroBatchExecution: Streaming query made progress: ...
+  INFO MicroBatchExecution: ... numInputRows: 60
+
+Leave this terminal open. The job runs continuously.
+
+================================================================================
+ SECTION 3 — DEMONSTRATING THE STREAMING JOB (live view)
+================================================================================
+
+--- METHOD A: Watch micro-batch progress in the Spark submit terminal ---
+
+Look for lines like this appearing every ~10 seconds:
+  INFO MicroBatchExecution: Streaming query made progress: {
+    "numInputRows" : 105,
+    "inputRowsPerSecond" : 10.4,
+    "processedRowsPerSecond" : 312.5,
+    ...
+  }
+This confirms events are being read from Kafka and processed.
+
+--- METHOD B: Watch live Kafka messages ---
+
+Open a second terminal and run:
+  docker exec kafka kafka-console-consumer `
+    --bootstrap-server localhost:9092 `
+    --topic clickstream-events `
+    --from-beginning
+
+You will see a stream of JSON events like:
+  {"event_id":"...","user_id":"USER-XXXX","product_id":"PROD-001",
+   "category":"Laptops","event_type":"view","timestamp":"..."}
+
+Press Ctrl+C to stop.
+
+--- METHOD C: Watch PostgreSQL rows grow in real time ---
+
+Open a second terminal and run this in a loop:
+  while ($true) {
+    docker exec postgres psql -U pipeline -d pipeline -c `
+      "SELECT COUNT(*) AS events FROM clickstream_events; `
+       SELECT COUNT(*) AS aggregations FROM product_view_aggregates;"
+    Start-Sleep -Seconds 10
+  }
+
+You will see the row counts increase every 10 seconds.
+
+--- METHOD D: Spark Master Web UI ---
+
+Open browser: http://localhost:8080
+Click on the running application "EcommerceClickstreamProcessor"
+The "Streaming" tab shows live throughput graphs.
+
+================================================================================
+ SECTION 4 — TRIGGER AIRFLOW DAGS
+================================================================================
+
+Open browser: http://localhost:8081
+Login: admin / admin
+
+Both DAGs should be visible and toggled ON (blue).
+
+To run them manually:
+  1. Click the Play (▶) button on "daily_product_report"
+  2. Click the Play (▶) button on "user_segmentation"
+  3. Watch the Recent Tasks column — tasks turn green when done (~5 seconds each)
+
+NOTE: Run these AFTER the Spark job has been running for at least 2 minutes
+so there is data in the tables for the DAGs to process.
+
+To verify DAG output in PostgreSQL:
+  docker exec postgres psql -U pipeline -d pipeline -c `
+    "SELECT COUNT(*) FROM daily_product_report; `
+     SELECT COUNT(*) FROM user_segments;"
+
+================================================================================
+ SECTION 5 — RUN THE CONVERSION RATE REPORT
+================================================================================
+
+Run this from your host machine (requires Python + psycopg2):
+  cd C:\Users\ASAM\Desktop\pipeline
+  pip install psycopg2-binary --quiet
+  $env:PIPELINE_DB_CONN = "postgresql+psycopg2://pipeline:pipeline@localhost:5432/pipeline"
+  python reports/conversion_rate_report.py
+
+Output files appear in:  reports/output/
+  • conversion_rates_<date>.csv
+  • category_conversion_summary_<date>.txt
+
+================================================================================
+ SECTION 6 — VERIFY GRAFANA DASHBOARD
+================================================================================
+
+Open browser: http://localhost:3000
+Login: admin / admin
+
+Navigate to: Dashboards → Clickstream Dashboard
+
+You should see 4 panels:
+  1. Real-Time Product Views       — bar chart, updates every 30s
+  2. Event Funnel                  — view → cart → purchase counts
+  3. Flash Sale Alerts             — products with high view / low purchase ratio
+  4. User Segmentation Summary     — Buyer vs Window Shopper counts
+
+If panels show "No data", the Spark job may not have run long enough yet.
+Wait 2 minutes and click the refresh button in Grafana.
+
+================================================================================
+ SECTION 7 — SHUT DOWN CLEANLY
+================================================================================
+
+To stop all containers (data is preserved in Docker volumes):
+  docker compose down
+
+To stop AND delete all data (full reset):
+  docker compose down -v
+
+================================================================================
+ SECTION 8 — FULL RESTART SEQUENCE (quick reference card)
+================================================================================
+
+  # 1. Start
+  cd C:\Users\ASAM\Desktop\pipeline
+  docker compose up -d
+
+  # 2. Wait 60 seconds, then fix Ivy cache
+  Start-Sleep -Seconds 60
+  docker exec -u root spark-master bash -c "mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars && chown -R spark:spark /home/spark"
+  docker exec -u root spark-worker  bash -c "mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars && chown -R spark:spark /home/spark"
+
+  # 3. Start Spark job (in a dedicated terminal — leave it running)
+  docker exec spark-master /opt/spark/bin/spark-submit `
+    --master spark://spark-master:7077 `
+    --packages "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.postgresql:postgresql:42.6.0" `
+    /opt/pipeline/spark/streaming_job.py
+
+  # 4. After 2 minutes, trigger Airflow DAGs
+  #    → http://localhost:8081  (admin / admin)
+  #    → Press Play on both DAGs
+
+  # 5. Open Grafana
+  #    → http://localhost:3000  (admin / admin)
+
+================================================================================
+ SECTION 9 — SERVICE URLS & CREDENTIALS
+================================================================================
+
+  Service          URL                        Login
+  ───────────────────────────────────────────────────────
+  Spark Master UI  http://localhost:8080       (no login)
+  Airflow          http://localhost:8081       admin / admin
+  Grafana          http://localhost:3000       admin / admin
+  PostgreSQL       localhost:5432              pipeline / pipeline
+  Kafka            localhost:9092              (no login)
+
+================================================================================
+ SECTION 10 — TROUBLESHOOTING
+================================================================================
+
+PROBLEM: Airflow login shows "Bad Request — CSRF tokens do not match"
+FIX:     Hard-refresh the browser (Ctrl+Shift+R) and try again.
+         This was fixed permanently by adding AIRFLOW__WEBSERVER__SECRET_KEY
+         to docker-compose.yml.
+
+PROBLEM: Spark submit exits with code 1 immediately
+FIX:     Re-run the Ivy cache fix from Step 3 above, then retry.
+
+PROBLEM: Spark submit exits with "TypeError: 'type' object is not subscriptable"
+FIX:     Already fixed — streaming_job.py uses List[Tuple] from typing module.
+
+PROBLEM: "NoBrokersAvailable" in producer logs
+FIX:     Normal on first start. Producer auto-restarts (restart: on-failure).
+         Wait 30 seconds and check: docker logs clickstream-producer --tail 5
+
+PROBLEM: Airflow DAGs ran successfully but 0 rows in database
+FIX:     Spark job was not running when DAGs executed. Start Spark job first,
+         wait 2 minutes, then re-trigger the DAGs.
+
+PROBLEM: Grafana panels show "No data"
+FIX:     Spark job needs to be running. Check http://localhost:8080 to confirm
+         the streaming application is listed as RUNNING.
+
+PROBLEM: docker compose ps shows error / exit code 1
+FIX:     Try: docker ps  (uses Docker daemon directly, bypasses compose)
+         If Docker Desktop is restarting, wait 30 seconds and retry.
+
+================================================================================
