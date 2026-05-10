@@ -94,7 +94,7 @@ pipeline/
 ### 1. Start the full stack
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 Services exposed:
@@ -119,7 +119,7 @@ python clickstream_producer.py
 ```bash
 docker exec spark-master spark-submit \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.postgresql:postgresql:42.6.0 \
-  /opt/spark-jobs/streaming_job.py
+  /opt/pipeline/spark/streaming_job.py
 ```
 
 ### 4. Trigger Airflow DAGs

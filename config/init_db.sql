@@ -27,6 +27,7 @@ SET search_path TO public;
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS clickstream_events (
     id            BIGSERIAL    PRIMARY KEY,
+    event_id      VARCHAR(64)  NOT NULL UNIQUE,
     user_id       VARCHAR(64)  NOT NULL,
     product_id    VARCHAR(64)  NOT NULL,
     category      VARCHAR(64),
@@ -67,7 +68,8 @@ CREATE TABLE IF NOT EXISTS flash_sale_alerts (
     window_start    TIMESTAMPTZ  NOT NULL,
     window_end      TIMESTAMPTZ  NOT NULL,
     alert_message   TEXT         NOT NULL,
-    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    UNIQUE (product_id, window_start, window_end)
 );
 
 -- ---------------------------------------------------------------------------

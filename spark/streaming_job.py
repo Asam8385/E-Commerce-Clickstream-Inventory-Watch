@@ -1,19 +1,23 @@
+import psycopg2
+from psycopg2.extras import execute_values
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StringType,
     StructField,
     StructType,
-    TimestampType,
 )
 
 from config.spark_config import (
     APP_NAME,
     FLASH_SALE_MAX_PURCHASES,
     FLASH_SALE_MIN_VIEWS,
-    JDBC_PROPERTIES,
-    JDBC_URL,
     KAFKA_SOURCE_OPTIONS,
+    PG_DB,
+    PG_HOST,
+    PG_PASSWORD,
+    PG_PORT,
+    PG_USER,
     SLIDE_DURATION,
     SPARK_MASTER,
     SPARK_PACKAGES,
@@ -37,6 +41,14 @@ EVENT_SCHEMA = StructType(
         StructField("referrer", StringType(), True),
     ]
 )
+
+POSTGRES_CONN_KWARGS = {
+    "host": PG_HOST,
+    "port": PG_PORT,
+    "dbname": PG_DB,
+    "user": PG_USER,
+    "password": PG_PASSWORD,
+}
 
 
 def create_spark_session() -> SparkSession:
@@ -97,19 +109,58 @@ def aggregate_windows(stream):
     )
 
 
+def execute_upsert(query: str, rows: list[tuple]) -> None:
+    if not rows:
+        return
+
+    connection = psycopg2.connect(**POSTGRES_CONN_KWARGS)
+    connection.autocommit = False
+    try:
+        with connection.cursor() as cursor:
+            execute_values(cursor, query, rows, page_size=500)
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def write_aggregates_to_postgres(agg_stream):
-    """Write each micro-batch of aggregated windows to PostgreSQL."""
+    """Upsert each micro-batch of aggregated windows into PostgreSQL."""
 
     def upsert_batch(batch_df, batch_id):
         if batch_df.isEmpty():
             return
-        (
-            batch_df.write.jdbc(
-                url=JDBC_URL,
-                table="product_view_aggregates",
-                mode="append",
-                properties=JDBC_PROPERTIES,
+        rows = [
+            tuple(row)
+            for row in batch_df.select(
+                "window_start",
+                "window_end",
+                "product_id",
+                "view_count",
+                "cart_count",
+                "purchase_count",
+                "computed_at",
+            ).collect()
+        ]
+        execute_upsert(
+            """
+            INSERT INTO product_view_aggregates (
+                window_start,
+                window_end,
+                product_id,
+                view_count,
+                cart_count,
+                purchase_count,
+                computed_at
             )
+            VALUES %s
+            ON CONFLICT (window_start, window_end, product_id)
+            DO UPDATE SET
+                view_count = EXCLUDED.view_count,
+                cart_count = EXCLUDED.cart_count,
+                purchase_count = EXCLUDED.purchase_count,
+                computed_at = EXCLUDED.computed_at
+            """,
+            rows,
         )
 
     return (
@@ -148,11 +199,38 @@ def write_flash_sale_alerts(agg_stream):
     def write_alerts(batch_df, batch_id):
         if batch_df.isEmpty():
             return
-        batch_df.write.jdbc(
-            url=JDBC_URL,
-            table="flash_sale_alerts",
-            mode="append",
-            properties=JDBC_PROPERTIES,
+        rows = [
+            tuple(row)
+            for row in batch_df.select(
+                "product_id",
+                "view_count",
+                "purchase_count",
+                "window_start",
+                "window_end",
+                "alert_message",
+                "created_at",
+            ).collect()
+        ]
+        execute_upsert(
+            """
+            INSERT INTO flash_sale_alerts (
+                product_id,
+                view_count,
+                purchase_count,
+                window_start,
+                window_end,
+                alert_message,
+                created_at
+            )
+            VALUES %s
+            ON CONFLICT (product_id, window_start, window_end)
+            DO UPDATE SET
+                view_count = EXCLUDED.view_count,
+                purchase_count = EXCLUDED.purchase_count,
+                alert_message = EXCLUDED.alert_message,
+                created_at = EXCLUDED.created_at
+            """,
+            rows,
         )
 
     return (
@@ -170,20 +248,34 @@ def write_raw_events_to_postgres(stream):
     def write_batch(batch_df, batch_id):
         if batch_df.isEmpty():
             return
-        (
-            batch_df.select(
+        rows = [
+            tuple(row)
+            for row in batch_df.select(
+                "event_id",
                 "user_id",
                 "product_id",
                 "category",
                 "event_type",
                 F.col("event_time").alias("event_time"),
                 F.current_timestamp().alias("ingested_at"),
-            ).write.jdbc(
-                url=JDBC_URL,
-                table="clickstream_events",
-                mode="append",
-                properties=JDBC_PROPERTIES,
+            ).collect()
+        ]
+        execute_upsert(
+            """
+            INSERT INTO clickstream_events (
+                event_id,
+                user_id,
+                product_id,
+                category,
+                event_type,
+                event_time,
+                ingested_at
             )
+            VALUES %s
+            ON CONFLICT (event_id)
+            DO NOTHING
+            """,
+            rows,
         )
 
     return (

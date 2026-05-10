@@ -84,9 +84,13 @@ services:
   # Apache Spark Master
   # ---------------------------------------------------------------------------
   spark-master:
-    image: bitnami/spark:3.4.1
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
+    image: pipeline-spark:3.4.1
     container_name: spark-master
     environment:
+      PYTHONPATH: /opt/pipeline
       SPARK_MODE: master
       SPARK_RPC_AUTHENTICATION_ENABLED: "no"
       SPARK_RPC_ENCRYPTION_ENABLED: "no"
@@ -94,16 +98,18 @@ services:
       - "8080:8080"
       - "7077:7077"
     volumes:
-      - ./spark:/opt/spark-jobs
+      - ./spark:/opt/pipeline/spark
+      - ./config:/opt/pipeline/config
       - spark_data:/opt/bitnami/spark/data
 
   # ---------------------------------------------------------------------------
   # Apache Spark Worker
   # ---------------------------------------------------------------------------
   spark-worker:
-    image: bitnami/spark:3.4.1
+    image: pipeline-spark:3.4.1
     container_name: spark-worker
     environment:
+      PYTHONPATH: /opt/pipeline
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077
       SPARK_WORKER_MEMORY: 2G
@@ -113,7 +119,8 @@ services:
     depends_on:
       - spark-master
     volumes:
-      - ./spark:/opt/spark-jobs
+      - ./spark:/opt/pipeline/spark
+      - ./config:/opt/pipeline/config
 
   # ---------------------------------------------------------------------------
   # Clickstream Producer
